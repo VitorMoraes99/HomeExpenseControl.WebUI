@@ -35,7 +35,7 @@ export function PersonModal({ isOpen, onClose, onSuccess }: PersonModalProps) {
 
       // Integração POST com a API.
       // O Axios serializa automaticamente o payload para JSON.
-      await api.post("/person", {
+      await api.post("/people", {
         name,
         age: Number(age), // Cast de segurança para garantir a tipagem esperada pelo C#
       });

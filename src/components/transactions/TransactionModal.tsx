@@ -1,5 +1,5 @@
-import { X, AlertCircle } from "lucide-react";
-import { useState, useEffect } from "react";
+import { X, AlertCircle, Info } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { api } from "../../services/api";
 
@@ -12,49 +12,73 @@ interface TransactionModalProps {
 interface Category {
   id: number;
   description: string;
+  purpose: "Expense" | "Income" | "Both";
 }
 
 interface Person {
   id: number;
   name: string;
+  age: number;
 }
 
 /**
- * Componente de Modal para registro de Transações Financeiras.
- * Lógica: Como a transação depende de Entidades Externas (Categoria e Pessoa),
- * precisamos carregar essas listas no momento da montagem (useEffect) para popular os 'Selects'.
+ * Componente de Modal para registro de Transações.
+ * Lógica de Negócio Aplicada:
+ * 1. Filtro de Categorias: Só exibe categorias compatíveis com o Tipo selecionado.
+ * 2. Bloqueio de Menores: Trava o tipo em "Despesa" caso a pessoa tenha menos de 18 anos.
  */
 export function TransactionModal({
   isOpen,
   onClose,
   onSuccess,
 }: TransactionModalProps) {
-  // --- Estados do Formulário ---
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState<number | "">("");
-
-  // O tipo começa como Expense (Despesa), refletindo o Enum do C#
   const [type, setType] = useState("Expense");
-
-  // Estados para armazenar as chaves estrangeiras selecionadas
   const [categoryId, setCategoryId] = useState<number | "">("");
   const [personId, setPersonId] = useState<number | "">("");
 
-  // --- Estados de Controle e Validação ---
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  // --- Estados de Dados Auxiliares (Para os Selects) ---
   const [categories, setCategories] = useState<Category[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [isLoadingDependencies, setIsLoadingDependencies] = useState(false);
 
-  // Carrega as Categorias e Pessoas apenas quando o Modal for aberto
+  // --- REGRA DE NEGÓCIO 1: VERIFICAÇÃO DE MENOR DE IDADE ---
+  // Acha a pessoa selecionada na lista
+  const selectedPerson = people.find((p) => p.id === personId);
+  const isMinor = selectedPerson ? selectedPerson.age < 18 : false;
+
+  // Se for menor de idade, força o tipo para "Expense" (Despesa) automaticamente
+  useEffect(() => {
+    if (isMinor && type !== "Expense") {
+      setType("Expense");
+    }
+  }, [isMinor, type]);
+
+  // --- REGRA DE NEGÓCIO 2: FILTRO DE CATEGORIAS ---
+  // Só lista categorias que sejam "Both" (Ambas) ou iguais ao Tipo selecionado
+  const availableCategories = useMemo(() => {
+    return categories.filter(
+      (cat) => cat.purpose === "Both" || cat.purpose === type,
+    );
+  }, [categories, type]);
+
+  // Se o usuário trocar o Tipo e a categoria que estava selecionada não for mais válida, limpa o campo
+  useEffect(() => {
+    if (categoryId !== "") {
+      const isValid = availableCategories.some((c) => c.id === categoryId);
+      if (!isValid) {
+        setCategoryId("");
+      }
+    }
+  }, [type, availableCategories, categoryId]);
+
   useEffect(() => {
     if (isOpen) {
       loadDependencies();
     } else {
-      // Limpa os dados se fechar o modal
       resetForm();
     }
   }, [isOpen]);
@@ -64,7 +88,6 @@ export function TransactionModal({
       setIsLoadingDependencies(true);
       setErrorMessage("");
 
-      // Dispara as duas requisições ao mesmo tempo usando Promise.all para maior performance
       const [categoriesResponse, peopleResponse] = await Promise.all([
         api.get("/categories"),
         api.get("/people"),
@@ -95,7 +118,6 @@ export function TransactionModal({
     e.preventDefault();
     setErrorMessage("");
 
-    // Validação extra no front-end para garantir que as dependências foram escolhidas
     if (!categoryId || !personId) {
       setErrorMessage("Por favor, selecione uma Categoria e uma Pessoa.");
       return;
@@ -103,8 +125,6 @@ export function TransactionModal({
 
     try {
       setIsSubmitting(true);
-
-      // Enviando os dados exatamente como o CreateTransactionDto do C# espera
       await api.post("/transactions", {
         description,
         amount: Number(amount),
@@ -118,11 +138,9 @@ export function TransactionModal({
     } catch (error) {
       console.error("Erro ao salvar transação:", error);
       let backendError = "Falha na conexão com o servidor.";
-
       if (axios.isAxiosError(error)) {
         backendError = error.response?.data?.message || backendError;
       }
-
       setErrorMessage(`Não foi possível salvar: ${backendError}`);
     } finally {
       setIsSubmitting(false);
@@ -152,7 +170,6 @@ export function TransactionModal({
             </div>
           )}
 
-          {/* Bloqueio Visual se faltarem cadastros base */}
           {!isLoadingDependencies &&
             (categories.length === 0 || people.length === 0) && (
               <div className="bg-yellow-50 text-yellow-700 p-3 rounded-lg flex items-start gap-2 text-sm border border-yellow-100 mb-4">
@@ -179,7 +196,7 @@ export function TransactionModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              placeholder="Ex: Compra no Mercado"
+              placeholder="Ex: Mesada, Conta de Luz..."
               disabled={isLoadingDependencies}
             />
           </div>
@@ -197,7 +214,7 @@ export function TransactionModal({
                 id="amount"
                 required
                 min={0.01}
-                step="0.01" // Permite valores quebrados (Decimais)
+                step="0.01"
                 value={amount}
                 onChange={(e) =>
                   setAmount(e.target.value === "" ? "" : Number(e.target.value))
@@ -220,45 +237,25 @@ export function TransactionModal({
                 required
                 value={type}
                 onChange={(e) => setType(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                disabled={isLoadingDependencies}
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none ${
+                  isMinor
+                    ? "bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed"
+                    : "bg-white border-gray-300"
+                }`}
+                disabled={isLoadingDependencies || isMinor}
               >
-                {/* Reflete o Enum TransactionType do C# */}
                 <option value="Expense">Despesa</option>
                 <option value="Income">Receita</option>
               </select>
             </div>
           </div>
 
-          <div>
-            <label
-              htmlFor="categoryId"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Categoria
-            </label>
-            <select
-              id="categoryId"
-              required
-              value={categoryId}
-              onChange={(e) =>
-                setCategoryId(
-                  e.target.value === "" ? "" : Number(e.target.value),
-                )
-              }
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-              disabled={isLoadingDependencies || categories.length === 0}
-            >
-              <option value="" disabled>
-                Selecione uma Categoria...
-              </option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.description}
-                </option>
-              ))}
-            </select>
-          </div>
+          {isMinor && (
+            <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 p-2 rounded-lg">
+              <Info size={14} />
+              <span>Menores de idade só podem registrar despesas.</span>
+            </div>
+          )}
 
           <div>
             <label
@@ -282,7 +279,42 @@ export function TransactionModal({
               </option>
               {people.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name}
+                  {p.name} (Idade: {p.age})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label
+              htmlFor="categoryId"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Categoria
+            </label>
+            <select
+              id="categoryId"
+              required
+              value={categoryId}
+              onChange={(e) =>
+                setCategoryId(
+                  e.target.value === "" ? "" : Number(e.target.value),
+                )
+              }
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+              disabled={
+                isLoadingDependencies || availableCategories.length === 0
+              }
+            >
+              <option value="" disabled>
+                {availableCategories.length === 0
+                  ? "Nenhuma categoria disponível para este tipo"
+                  : "Selecione uma Categoria..."}
+              </option>
+
+              {availableCategories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.description}
                 </option>
               ))}
             </select>
@@ -300,7 +332,9 @@ export function TransactionModal({
             <button
               type="submit"
               disabled={
-                isSubmitting || categories.length === 0 || people.length === 0
+                isSubmitting ||
+                availableCategories.length === 0 ||
+                people.length === 0
               }
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50"
             >

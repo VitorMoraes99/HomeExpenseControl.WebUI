@@ -1,219 +1,167 @@
-import { Wallet, TrendingDown, TrendingUp } from "lucide-react";
-import { SummaryCard } from "../components/dashboard/SummaryCard";
+import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  AlertCircle,
+} from "lucide-react";
+import { useState, useEffect } from "react";
+import { api } from "../services/api";
 
-// Mocks que simulam o retorno do seu C# (já processado com os totais)
-const personTotals = [
-  { id: 1, name: "Vitor Moraes", income: 5000, expense: 1200, balance: 3800 },
-  { id: 2, name: "João da Silva", income: 0, expense: 450.5, balance: -450.5 },
-  { id: 3, name: "Maria Oliveira", income: 0, expense: 15.0, balance: -15.0 },
-];
+// Reutilizamos a tipagem da transação para manter a consistência
+interface Transaction {
+  id: number;
+  amount: number;
+  type: "Income" | "Expense";
+}
 
-const categoryTotals = [
-  { id: 1, description: "Salário", income: 5000, expense: 0, balance: 5000 },
-  {
-    id: 2,
-    description: "Alimentação",
-    income: 0,
-    expense: 465.5,
-    balance: -465.5,
-  },
-  { id: 3, description: "Moradia", income: 0, expense: 1200, balance: -1200 },
-];
+// Tipagem para o nosso objeto de resumo matemático
+interface Summary {
+  income: number;
+  expense: number;
+  total: number;
+}
 
 /**
- * Módulo de Dashboard (Totais)
- * Requisitos atendidos:
- * - Consulta de totais por pessoa (com total geral no rodapé)
- * - Consulta de totais por categoria (bônus opcional do teste, com total geral)
+ * Página de Dashboard Principal.
+ * Decisão de Arquitetura: Optamos por buscar todas as transações e calcular
+ * o resumo no Front-end (usando array.reduce). Em uma aplicação de altíssima escala,
+ * esse cálculo seria movido para o Back-end (ex: um endpoint /api/transactions/summary)
+ * para poupar processamento e tráfego de rede do cliente.
  */
 export function Dashboard() {
-  // Funções para calcular o "Total Geral" exigido no teste
-  const grandTotalPerson = personTotals.reduce(
-    (acc, curr) => ({
-      income: acc.income + curr.income,
-      expense: acc.expense + curr.expense,
-      balance: acc.balance + curr.balance,
-    }),
-    { income: 0, expense: 0, balance: 0 },
-  );
+  const [summary, setSummary] = useState<Summary>({
+    income: 0,
+    expense: 0,
+    total: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const grandTotalCategory = categoryTotals.reduce(
-    (acc, curr) => ({
-      income: acc.income + curr.income,
-      expense: acc.expense + curr.expense,
-      balance: acc.balance + curr.balance,
-    }),
-    { income: 0, expense: 0, balance: 0 },
-  );
+  useEffect(() => {
+    loadSummary();
+  }, []);
 
-  // Formatador de Moeda
-  const formatMoney = (value: number) =>
-    new Intl.NumberFormat("pt-BR", {
+  const loadSummary = async () => {
+    try {
+      setIsLoading(true);
+
+      // Busca todas as transações para extrair os valores
+      const response = await api.get<Transaction[]>("/transactions");
+      const transactions = response.data;
+
+      // Lógica de Negócio (Front-end): Calculando os totais usando o poderoso método reduce
+      const calculatedSummary = transactions.reduce(
+        (acc, transaction) => {
+          if (transaction.type === "Income") {
+            acc.income += transaction.amount;
+            acc.total += transaction.amount;
+          } else {
+            acc.expense += transaction.amount;
+            acc.total -= transaction.amount; // Despesas subtraem do total
+          }
+          return acc;
+        },
+        { income: 0, expense: 0, total: 0 }, // Valor inicial do acumulador (acc)
+      );
+
+      setSummary(calculatedSummary);
+    } catch (error) {
+      console.error("Erro ao carregar dashboard:", error);
+      setErrorMessage(
+        "Não foi possível carregar o resumo financeiro no momento.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Função utilitária para formatar valores monetários no padrão brasileiro
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
     }).format(value);
+  };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-800">Totais Gerais</h2>
+        <h2 className="text-2xl font-bold text-gray-800">Dashboard</h2>
         <p className="text-gray-500 mt-1">
-          Acompanhe os gastos da sua casa de forma simples.
+          Acompanhe o resumo das suas finanças.
         </p>
       </div>
 
-      {/* Cards de Resumo no Topo */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <SummaryCard
-          title="Saldo Líquido Geral"
-          amount={formatMoney(grandTotalPerson.balance)}
-          icon={Wallet}
-          iconColorClass="text-blue-600"
-          iconBgClass="bg-blue-50"
-        />
-        <SummaryCard
-          title="Total de Receitas"
-          amount={formatMoney(grandTotalPerson.income)}
-          icon={TrendingUp}
-          iconColorClass="text-green-600"
-          iconBgClass="bg-green-50"
-        />
-        <SummaryCard
-          title="Total de Despesas"
-          amount={formatMoney(grandTotalPerson.expense)}
-          icon={TrendingDown}
-          iconColorClass="text-red-600"
-          iconBgClass="bg-red-50"
-        />
-      </div>
+      {/* Tratamento de Erro Amigável */}
+      {errorMessage && (
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl flex items-start gap-3 border border-red-100">
+          <AlertCircle size={20} className="shrink-0 mt-0.5" />
+          <p>{errorMessage}</p>
+        </div>
+      )}
 
-      {/* Grid para colocar as duas tabelas lado a lado em telas grandes */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Tabela: Totais por Pessoa */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
-          <div className="p-6 border-b border-gray-50">
-            <h3 className="text-lg font-bold text-gray-800">
-              Totais por Pessoa
-            </h3>
+      {/* Grid de Cards (Design Responsivo: 1 coluna no celular, 3 no PC) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Card: Receitas */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-gray-500 font-medium">Entradas</h3>
+            <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center text-green-600">
+              <TrendingUp size={20} />
+            </div>
           </div>
-          <div className="overflow-x-auto flex-1">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-gray-500 uppercase tracking-wider">
-                  <th className="px-6 py-4 font-semibold">Pessoa</th>
-                  <th className="px-6 py-4 font-semibold text-right">
-                    Receitas
-                  </th>
-                  <th className="px-6 py-4 font-semibold text-right">
-                    Despesas
-                  </th>
-                  <th className="px-6 py-4 font-semibold text-right">Saldo</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {personTotals.map((p) => (
-                  <tr key={p.id} className="hover:bg-gray-50/50">
-                    <td className="px-6 py-4 text-gray-800 font-medium">
-                      {p.name}
-                    </td>
-                    <td className="px-6 py-4 text-green-600 text-right">
-                      {formatMoney(p.income)}
-                    </td>
-                    <td className="px-6 py-4 text-red-600 text-right">
-                      {formatMoney(p.expense)}
-                    </td>
-                    <td
-                      className={`px-6 py-4 text-right font-bold ${p.balance >= 0 ? "text-blue-600" : "text-red-600"}`}
-                    >
-                      {formatMoney(p.balance)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              {/* Rodapé exigido pelo teste (Total Geral) */}
-              <tfoot className="bg-gray-50 font-bold border-t-2 border-gray-100">
-                <tr>
-                  <td className="px-6 py-4 text-gray-800 uppercase text-xs tracking-wider">
-                    Total Geral
-                  </td>
-                  <td className="px-6 py-4 text-green-600 text-right">
-                    {formatMoney(grandTotalPerson.income)}
-                  </td>
-                  <td className="px-6 py-4 text-red-600 text-right">
-                    {formatMoney(grandTotalPerson.expense)}
-                  </td>
-                  <td
-                    className={`px-6 py-4 text-right ${grandTotalPerson.balance >= 0 ? "text-blue-600" : "text-red-600"}`}
-                  >
-                    {formatMoney(grandTotalPerson.balance)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+          <div>
+            {isLoading ? (
+              <div className="h-8 w-32 bg-gray-200 animate-pulse rounded"></div>
+            ) : (
+              <span className="text-3xl font-bold text-gray-800">
+                {formatCurrency(summary.income)}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Tabela: Totais por Categoria (Opcional do Teste) */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
-          <div className="p-6 border-b border-gray-50">
-            <h3 className="text-lg font-bold text-gray-800">
-              Totais por Categoria
-            </h3>
+        {/* Card: Despesas */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-gray-500 font-medium">Saídas</h3>
+            <div className="w-10 h-10 bg-red-50 rounded-full flex items-center justify-center text-red-600">
+              <TrendingDown size={20} />
+            </div>
           </div>
-          <div className="overflow-x-auto flex-1">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-gray-500 uppercase tracking-wider">
-                  <th className="px-6 py-4 font-semibold">Categoria</th>
-                  <th className="px-6 py-4 font-semibold text-right">
-                    Receitas
-                  </th>
-                  <th className="px-6 py-4 font-semibold text-right">
-                    Despesas
-                  </th>
-                  <th className="px-6 py-4 font-semibold text-right">Saldo</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {categoryTotals.map((c) => (
-                  <tr key={c.id} className="hover:bg-gray-50/50">
-                    <td className="px-6 py-4 text-gray-800 font-medium">
-                      {c.description}
-                    </td>
-                    <td className="px-6 py-4 text-green-600 text-right">
-                      {formatMoney(c.income)}
-                    </td>
-                    <td className="px-6 py-4 text-red-600 text-right">
-                      {formatMoney(c.expense)}
-                    </td>
-                    <td
-                      className={`px-6 py-4 text-right font-bold ${c.balance >= 0 ? "text-blue-600" : "text-red-600"}`}
-                    >
-                      {formatMoney(c.balance)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              {/* Rodapé exigido pelo teste (Total Geral) */}
-              <tfoot className="bg-gray-50 font-bold border-t-2 border-gray-100">
-                <tr>
-                  <td className="px-6 py-4 text-gray-800 uppercase text-xs tracking-wider">
-                    Total Geral
-                  </td>
-                  <td className="px-6 py-4 text-green-600 text-right">
-                    {formatMoney(grandTotalCategory.income)}
-                  </td>
-                  <td className="px-6 py-4 text-red-600 text-right">
-                    {formatMoney(grandTotalCategory.expense)}
-                  </td>
-                  <td
-                    className={`px-6 py-4 text-right ${grandTotalCategory.balance >= 0 ? "text-blue-600" : "text-red-600"}`}
-                  >
-                    {formatMoney(grandTotalCategory.balance)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+          <div>
+            {isLoading ? (
+              <div className="h-8 w-32 bg-gray-200 animate-pulse rounded"></div>
+            ) : (
+              <span className="text-3xl font-bold text-gray-800">
+                {formatCurrency(summary.expense)}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Card: Saldo Total (A cor muda dinamicamente se o saldo for negativo) */}
+        <div
+          className={`p-6 rounded-2xl shadow-sm flex flex-col justify-between transition-colors ${
+            summary.total >= 0
+              ? "bg-blue-600 text-white border-transparent"
+              : "bg-red-600 text-white border-transparent"
+          }`}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-medium opacity-90">Saldo Atual</h3>
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white">
+              <DollarSign size={20} />
+            </div>
+          </div>
+          <div>
+            {isLoading ? (
+              <div className="h-8 w-32 bg-white/30 animate-pulse rounded"></div>
+            ) : (
+              <span className="text-3xl font-bold">
+                {formatCurrency(summary.total)}
+              </span>
+            )}
           </div>
         </div>
       </div>

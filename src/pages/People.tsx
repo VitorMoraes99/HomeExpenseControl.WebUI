@@ -25,7 +25,7 @@ export function People() {
   const loadPeople = async () => {
     try {
       setIsLoading(true);
-      const response = await api.get("/person");
+      const response = await api.get("/people");
       setPeople(response.data);
     } catch (error) {
       console.error("Erro ao buscar pessoas:", error);
