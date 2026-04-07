@@ -1,26 +1,49 @@
 import { Plus, Pencil, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CategoryModal } from "../components/categories/CategoryModal";
+import { api } from "../services/api"; // Importando o Axios que você configurou!
 
-// Mock de dados seguindo exatamente os campos exigidos no teste
-const mockCategories = [
-  { id: 1, description: "Alimentação", purpose: "despesa" },
-  { id: 2, description: "Salário", purpose: "receita" },
-  { id: 3, description: "Vendas Diversas", purpose: "ambas" },
-];
+// Definimos o formato exato que o seu C# devolve para o TypeScript não reclamar
+interface Category {
+  id: number;
+  description: string;
+  purpose: string;
+}
 
-/**
- * Módulo de Cadastro de Categorias.
- * * Requisitos atendidos nesta tela:
- * - Listagem de categorias cadastradas.
- * - Exibição dos campos obrigatórios: Identificador, Descrição e Finalidade.
- */
 export function Categories() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Função auxiliar para renderizar uma badge bonitinha dependendo da finalidade
+  // Nossos novos estados: um para guardar as categorias do banco, outro para mostrar "Carregando..."
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Função que vai lá no C# buscar as categorias
+  const loadCategories = async () => {
+    try {
+      setIsLoading(true);
+      // Aqui a mágica acontece! Bate no endpoint GET /api/categories
+      const response = await api.get("/categories");
+      setCategories(response.data);
+    } catch (error) {
+      console.error("Erro ao buscar categorias:", error);
+      alert(
+        "Não foi possível carregar as categorias. Verifique se a API está rodando.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // O useEffect com array vazio [] roda UMA única vez assim que o usuário entra na tela
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
   const renderPurposeBadge = (purpose: string) => {
-    switch (purpose) {
+    // Normalizando a string para garantir que minúsculas/maiúsculas do C# não quebrem a cor
+    const normalizedPurpose = purpose.toLowerCase();
+
+    switch (normalizedPurpose) {
       case "despesa":
         return (
           <span className="px-2 py-1 bg-red-100 text-red-700 rounded-md text-xs font-medium uppercase">
@@ -75,32 +98,58 @@ export function Categories() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {mockCategories.map((category) => (
-                <tr
-                  key={category.id}
-                  className="hover:bg-gray-50/50 transition-colors"
-                >
-                  <td className="px-6 py-4 text-gray-500 font-medium">
-                    #{category.id}
-                  </td>
-                  <td className="px-6 py-4 text-gray-800 font-medium">
-                    {category.description}
-                  </td>
-                  <td className="px-6 py-4">
-                    {renderPurposeBadge(category.purpose)}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-center gap-3">
-                      <button className="text-blue-600 hover:text-blue-800 transition-colors">
-                        <Pencil size={18} />
-                      </button>
-                      <button className="text-red-600 hover:text-red-800 transition-colors">
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
+              {/* Se estiver carregando, mostra uma mensagem simples */}
+              {isLoading && (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
+                    Carregando categorias do servidor...
                   </td>
                 </tr>
-              ))}
+              )}
+
+              {/* Se terminou de carregar e não tem nada, avisa o usuário */}
+              {!isLoading && categories.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
+                    Nenhuma categoria cadastrada no banco de dados.
+                  </td>
+                </tr>
+              )}
+
+              {/* Loop real nos dados do banco */}
+              {!isLoading &&
+                categories.map((category) => (
+                  <tr
+                    key={category.id}
+                    className="hover:bg-gray-50/50 transition-colors"
+                  >
+                    <td className="px-6 py-4 text-gray-500 font-medium">
+                      #{category.id}
+                    </td>
+                    <td className="px-6 py-4 text-gray-800 font-medium">
+                      {category.description}
+                    </td>
+                    <td className="px-6 py-4">
+                      {renderPurposeBadge(category.purpose)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center gap-3">
+                        <button className="text-blue-600 hover:text-blue-800 transition-colors">
+                          <Pencil size={18} />
+                        </button>
+                        <button className="text-red-600 hover:text-red-800 transition-colors">
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
@@ -109,6 +158,7 @@ export function Categories() {
       <CategoryModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        onSuccess={loadCategories}
       />
     </div>
   );
