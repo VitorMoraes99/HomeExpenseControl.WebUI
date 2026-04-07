@@ -1,23 +1,43 @@
-import { Plus, Pencil, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Plus, Pencil, Trash2, User } from "lucide-react";
+import { useState, useEffect } from "react";
 import { PersonModal } from "../components/people/PersonModal";
+import { api } from "../services/api";
 
-const mockPeople = [
-  { id: 1, name: "Vitor Moraes", age: 26 },
-  { id: 2, name: "João da Silva", age: 45 },
-  { id: 3, name: "Maria Oliveira", age: 17 },
-];
+interface Person {
+  id: number;
+  name: string;
+}
 
 /**
- * Módulo de Cadastro de Pessoas.
- * * Requisitos atendidos nesta tela:
- * - Listagem de pessoas cadastradas.
- * - Exibição dos campos obrigatórios: Identificador, Nome (max 200) e Idade.
- * - Acesso às ações de Criação, Edição e Deleção.
+ * Página principal de gestão de Pessoas.
+ * Implementa a listagem (GET) e coordena a abertura do Modal de criação (POST).
  */
 export function People() {
-  // Estado para controlar a visibilidade do formulário de criação
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [people, setPeople] = useState<Person[]>([]);
+
+  // Estado para gerenciar a UX de carregamento, evitando que a tela pisque
+  // com "Nenhum dado" antes da API retornar a resposta.
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Extraímos a chamada da API para uma função separada para permitir
+  // reuso tanto no mount do componente quanto após o sucesso de um novo cadastro.
+  const loadPeople = async () => {
+    try {
+      setIsLoading(true);
+      const response = await api.get("/person");
+      setPeople(response.data);
+    } catch (error) {
+      console.error("Erro ao buscar pessoas:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Ciclo de vida: Busca a lista de pessoas assim que a tela é montada
+  useEffect(() => {
+    loadPeople();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -25,11 +45,10 @@ export function People() {
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Pessoas</h2>
           <p className="text-gray-500 mt-1">
-            Gerencie os moradores e membros da casa.
+            Gerencie os usuários e contatos do sistema.
           </p>
         </div>
 
-        {/* Ao clicar, alteramos o estado para abrir o modal */}
         <button
           onClick={() => setIsModalOpen(true)}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
@@ -42,19 +61,42 @@ export function People() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            {/* ... (O cabeçalho e o tbody continuam exatamente iguais ao que você já tinha) ... */}
             <thead>
               <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
                 <th className="px-6 py-4 font-semibold w-24">ID</th>
                 <th className="px-6 py-4 font-semibold">Nome</th>
-                <th className="px-6 py-4 font-semibold w-32">Idade</th>
                 <th className="px-6 py-4 font-semibold w-32 text-center">
                   Ações
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {mockPeople.map((person) => (
+              {/* Feedback de carregamento (Loading State) */}
+              {isLoading && (
+                <tr>
+                  <td
+                    colSpan={3}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
+                    Carregando...
+                  </td>
+                </tr>
+              )}
+
+              {/* Empty State: Mostrado apenas quando já carregou e a lista está vazia */}
+              {!isLoading && people.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={3}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
+                    Nenhuma pessoa cadastrada.
+                  </td>
+                </tr>
+              )}
+
+              {/* Renderização da lista hidratada pela API */}
+              {people.map((person) => (
                 <tr
                   key={person.id}
                   className="hover:bg-gray-50/50 transition-colors"
@@ -62,16 +104,22 @@ export function People() {
                   <td className="px-6 py-4 text-gray-500 font-medium">
                     #{person.id}
                   </td>
-                  <td className="px-6 py-4 text-gray-800 font-medium">
-                    {person.name}
-                  </td>
-                  <td className="px-6 py-4 text-gray-600">{person.age} anos</td>
                   <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center">
+                        <User size={16} />
+                      </div>
+                      <span className="text-gray-800 font-medium">
+                        {person.name}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
                     <div className="flex items-center justify-center gap-3">
-                      <button className="text-blue-600 hover:text-blue-800 transition-colors">
+                      <button className="text-blue-600 hover:text-blue-800">
                         <Pencil size={18} />
                       </button>
-                      <button className="text-red-600 hover:text-red-800 transition-colors">
+                      <button className="text-red-600 hover:text-red-800">
                         <Trash2 size={18} />
                       </button>
                     </div>
@@ -83,8 +131,11 @@ export function People() {
         </div>
       </div>
 
-      {/* Injeção do Modal na página. Passamos o estado e a função para fechar */}
-      <PersonModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <PersonModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={loadPeople}
+      />
     </div>
   );
 }
