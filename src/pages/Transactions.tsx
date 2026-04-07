@@ -1,45 +1,60 @@
-import { Plus, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
-import { useState } from "react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  ArrowUpCircle,
+  ArrowDownCircle,
+} from "lucide-react";
+import { useState, useEffect } from "react";
 import { TransactionModal } from "../components/transactions/TransactionModal";
+import { api } from "../services/api";
 
-const mockTransactions = [
-  {
-    id: 1,
-    description: "Compra no Carrefour",
-    amount: 450.5,
-    type: "despesa",
-    category: "Alimentação",
-    person: "Vitor Moraes",
-  },
-  {
-    id: 2,
-    description: "Salário DMsoft",
-    amount: 5000,
-    type: "receita",
-    category: "Salário",
-    person: "Vitor Moraes",
-  },
-  {
-    id: 3,
-    description: "Lanche na Escola",
-    amount: 15.0,
-    type: "despesa",
-    category: "Alimentação",
-    person: "Maria Oliveira",
-  },
-];
+// Tipagem baseada no seu TransactionResponseDto
+interface Transaction {
+  id: number;
+  description: string;
+  amount: number;
+  type: "Income" | "Expense";
+  categoryId: number;
+  personId: number;
+}
 
 export function Transactions() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Função que será passada no onSuccess do Modal!
+  const loadTransactions = async () => {
+    try {
+      setIsLoading(true);
+      const response = await api.get("/transactions");
+      setTransactions(response.data);
+    } catch (error) {
+      console.error("Erro ao buscar transações:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTransactions();
+  }, []);
+
+  // Função auxiliar para formatar moeda
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(value);
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Transações</h2>
-          <p className="text-gray-500 mt-1">
-            Lançamento de receitas e despesas da residência.
-          </p>
+          <p className="text-gray-500 mt-1">Controle de receitas e despesas.</p>
         </div>
 
         <button
@@ -47,7 +62,7 @@ export function Transactions() {
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
         >
           <Plus size={20} />
-          Nova Transação
+          Nova Lançamento
         </button>
       </div>
 
@@ -56,40 +71,72 @@ export function Transactions() {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                <th className="px-6 py-4 font-semibold w-24">Tipo</th>
                 <th className="px-6 py-4 font-semibold">Descrição</th>
-                <th className="px-6 py-4 font-semibold">Pessoa</th>
-                <th className="px-6 py-4 font-semibold">Categoria</th>
                 <th className="px-6 py-4 font-semibold">Valor</th>
+                <th className="px-6 py-4 font-semibold w-32 text-center">
+                  Ações
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {mockTransactions.map((t) => (
+              {isLoading && (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
+                    Carregando...
+                  </td>
+                </tr>
+              )}
+
+              {!isLoading && transactions.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
+                    Nenhuma transação registrada.
+                  </td>
+                </tr>
+              )}
+
+              {transactions.map((transaction) => (
                 <tr
-                  key={t.id}
+                  key={transaction.id}
                   className="hover:bg-gray-50/50 transition-colors"
                 >
-                  <td className="px-6 py-4 text-gray-800 font-medium">
-                    {t.description}
+                  <td className="px-6 py-4">
+                    {transaction.type === "Income" ? (
+                      <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-1 rounded-full w-fit text-sm font-medium">
+                        <ArrowUpCircle size={16} />
+                        <span>Receita</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-red-600 bg-red-50 px-3 py-1 rounded-full w-fit text-sm font-medium">
+                        <ArrowDownCircle size={16} />
+                        <span>Despesa</span>
+                      </div>
+                    )}
                   </td>
-                  <td className="px-6 py-4 text-gray-600">{t.person}</td>
-                  <td className="px-6 py-4 text-gray-500">
-                    <span className="bg-gray-100 px-2 py-1 rounded-md text-sm">
-                      {t.category}
-                    </span>
+                  <td className="px-6 py-4 text-gray-800 font-medium">
+                    {transaction.description}
                   </td>
                   <td
-                    className={`px-6 py-4 font-semibold ${t.type === "receita" ? "text-green-600" : "text-red-600"}`}
+                    className={`px-6 py-4 font-bold ${transaction.type === "Income" ? "text-green-600" : "text-red-600"}`}
                   >
-                    <div className="flex items-center gap-2">
-                      {t.type === "receita" ? (
-                        <ArrowUpCircle size={16} />
-                      ) : (
-                        <ArrowDownCircle size={16} />
-                      )}
-                      {new Intl.NumberFormat("pt-BR", {
-                        style: "currency",
-                        currency: "BRL",
-                      }).format(t.amount)}
+                    {transaction.type === "Expense" ? "- " : "+ "}
+                    {formatCurrency(transaction.amount)}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <div className="flex items-center justify-center gap-3">
+                      <button className="text-blue-600 hover:text-blue-800">
+                        <Pencil size={18} />
+                      </button>
+                      <button className="text-red-600 hover:text-red-800">
+                        <Trash2 size={18} />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -102,6 +149,7 @@ export function Transactions() {
       <TransactionModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        onSuccess={loadTransactions}
       />
     </div>
   );
