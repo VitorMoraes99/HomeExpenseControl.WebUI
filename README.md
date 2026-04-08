@@ -1,73 +1,67 @@
-# React + TypeScript + Vite
+# 📊 Home Expense Control - Web (Front-end)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Este é o módulo Front-end do sistema de Controle de Gastos Residenciais. Uma aplicação web responsiva, construída com foco em usabilidade, performance e aderência estrita a regras de negócio financeiras.
 
-Currently, two official plugins are available:
+## 🚀 Tecnologias Utilizadas
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **React (v18)** - Biblioteca principal para construção da interface.
+- **TypeScript** - Tipagem estática para maior segurança e previsibilidade do código.
+- **Vite** - Bundler ultrarrápido para desenvolvimento.
+- **Tailwind CSS** - Estilização utilitária para um design moderno e responsivo.
+- **Axios** - Gerenciamento de requisições HTTP para a API.
+- **Lucide React** - Biblioteca de ícones limpos e consistentes.
 
-## React Compiler
+## ✨ Funcionalidades e Regras de Negócio Implementadas
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+O sistema atende a 100% dos requisitos propostos, incluindo os desafios opcionais:
 
-## Expanding the ESLint configuration
+- **📊 Dashboard Financeiro Avançado:**
+  - Cálculo em tempo real de totais de Entradas, Saídas e Saldo Atual.
+  - Relatório detalhado agrupado por Pessoa.
+  - Relatório detalhado agrupado por Categoria (Requisito Bônus).
+- **👥 Gestão de Pessoas (CRUD Completo):**
+  - Criação, edição, exclusão e listagem de usuários do sistema.
+  - UX: Alerta de segurança ao tentar deletar um usuário (Cascade Delete na API).
+- **🏷️ Gestão de Categorias (CRUD Completo):**
+  - Organização por finalidade: Receita, Despesa ou Ambas.
+- **💸 Gestão de Transações (CRUD Completo):**
+  - Lançamento de receitas e despesas associadas a Pessoas e Categorias.
+  - Regra de Negócio 1: Filtro dinâmico de categorias com base no tipo da transação escolhida.
+  - Regra de Negócio 2: Bloqueio de interface para menores de 18 anos (forçando o lançamento apenas como "Despesa").
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## ⚙️ Como executar o projeto localmente
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Pré-requisitos
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- Node.js (versão 18 ou superior recomendada).
+- Gerenciador de pacotes (npm ou yarn).
+- A API Back-end em C# estar em execução localmente.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### Passo a passo
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+1. Clone o repositório
+   git clone [COLOQUE_A_URL_AQUI]
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+2. Acesse a pasta do projeto
+   cd [NOME_DA_PASTA_DO_FRONTEND]
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+3. Instale as dependências
+   npm install
+
+4. Configuração da API
+   Certifique-se de que a URL da API no arquivo src/services/api.ts aponta para a mesma porta em que o seu Back-end C# está rodando (padrão: http://localhost:5175/api).
+
+5. Inicie o servidor de desenvolvimento
+   npm run dev
+
+6. Acesse no navegador
+   Abra o link fornecido no terminal (geralmente http://localhost:5173).
+
+## 📁 Estrutura de Diretórios Principais
+
+src/
+├── components/ # Componentes isolados (ex: Modais, Formulários)
+├── pages/ # Páginas da aplicação (Dashboard, Pessoas, Categorias)
+├── services/ # Configurações de serviços externos (Axios API)
+├── App.tsx # Configuração de Rotas e Layout principal
+└── main.tsx # Ponto de entrada do React
