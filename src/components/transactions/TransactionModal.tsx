@@ -7,6 +7,14 @@ interface TransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  transactionToEdit?: {
+    id: number;
+    description: string;
+    amount: number;
+    type: string;
+    categoryId: number;
+    personId: number;
+  } | null;
 }
 
 interface Category {
@@ -21,16 +29,11 @@ interface Person {
   age: number;
 }
 
-/**
- * Componente de Modal para registro de Transações.
- * Lógica de Negócio Aplicada:
- * 1. Filtro de Categorias: Só exibe categorias compatíveis com o Tipo selecionado.
- * 2. Bloqueio de Menores: Trava o tipo em "Despesa" caso a pessoa tenha menos de 18 anos.
- */
 export function TransactionModal({
   isOpen,
   onClose,
   onSuccess,
+  transactionToEdit,
 }: TransactionModalProps) {
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState<number | "">("");
@@ -45,27 +48,21 @@ export function TransactionModal({
   const [people, setPeople] = useState<Person[]>([]);
   const [isLoadingDependencies, setIsLoadingDependencies] = useState(false);
 
-  // --- REGRA DE NEGÓCIO 1: VERIFICAÇÃO DE MENOR DE IDADE ---
-  // Acha a pessoa selecionada na lista
   const selectedPerson = people.find((p) => p.id === personId);
   const isMinor = selectedPerson ? selectedPerson.age < 18 : false;
 
-  // Se for menor de idade, força o tipo para "Expense" (Despesa) automaticamente
   useEffect(() => {
     if (isMinor && type !== "Expense") {
       setType("Expense");
     }
   }, [isMinor, type]);
 
-  // --- REGRA DE NEGÓCIO 2: FILTRO DE CATEGORIAS ---
-  // Só lista categorias que sejam "Both" (Ambas) ou iguais ao Tipo selecionado
   const availableCategories = useMemo(() => {
     return categories.filter(
       (cat) => cat.purpose === "Both" || cat.purpose === type,
     );
   }, [categories, type]);
 
-  // Se o usuário trocar o Tipo e a categoria que estava selecionada não for mais válida, limpa o campo
   useEffect(() => {
     if (categoryId !== "") {
       const isValid = availableCategories.some((c) => c.id === categoryId);
@@ -77,29 +74,35 @@ export function TransactionModal({
 
   useEffect(() => {
     if (isOpen) {
-      loadDependencies();
+      loadDependencies().then(() => {
+        if (transactionToEdit) {
+          setDescription(transactionToEdit.description);
+          setAmount(transactionToEdit.amount);
+          setType(transactionToEdit.type);
+          setCategoryId(transactionToEdit.categoryId);
+          setPersonId(transactionToEdit.personId);
+        } else {
+          resetForm();
+        }
+      });
     } else {
       resetForm();
     }
-  }, [isOpen]);
+  }, [isOpen, transactionToEdit]);
 
   const loadDependencies = async () => {
     try {
       setIsLoadingDependencies(true);
       setErrorMessage("");
-
       const [categoriesResponse, peopleResponse] = await Promise.all([
         api.get("/categories"),
         api.get("/people"),
       ]);
-
       setCategories(categoriesResponse.data);
       setPeople(peopleResponse.data);
     } catch (error) {
       console.error("Erro ao carregar dependências:", error);
-      setErrorMessage(
-        "Erro ao carregar listas. Tente abrir o formulário novamente.",
-      );
+      setErrorMessage("Erro ao carregar listas. Tente abrir novamente.");
     } finally {
       setIsLoadingDependencies(false);
     }
@@ -125,18 +128,24 @@ export function TransactionModal({
 
     try {
       setIsSubmitting(true);
-      await api.post("/transactions", {
+      const payload = {
         description,
         amount: Number(amount),
         type,
         categoryId: Number(categoryId),
         personId: Number(personId),
-      });
+      };
+
+      if (transactionToEdit) {
+        await api.put(`/transactions/${transactionToEdit.id}`, payload);
+      } else {
+        await api.post("/transactions", payload);
+      }
 
       onClose();
       onSuccess();
     } catch (error) {
-      console.error("Erro ao salvar transação:", error);
+      console.error("Erro ao salvar:", error);
       let backendError = "Falha na conexão com o servidor.";
       if (axios.isAxiosError(error)) {
         backendError = error.response?.data?.message || backendError;
@@ -153,10 +162,12 @@ export function TransactionModal({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-          <h3 className="text-lg font-bold text-gray-800">Nova Transação</h3>
+          <h3 className="text-lg font-bold text-gray-800">
+            {transactionToEdit ? "Editar Transação" : "Nova Transação"}
+          </h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 hover:text-gray-600"
           >
             <X size={20} />
           </button>
@@ -172,46 +183,34 @@ export function TransactionModal({
 
           {!isLoadingDependencies &&
             (categories.length === 0 || people.length === 0) && (
-              <div className="bg-yellow-50 text-yellow-700 p-3 rounded-lg flex items-start gap-2 text-sm border border-yellow-100 mb-4">
+              <div className="bg-yellow-50 text-yellow-700 p-3 rounded-lg flex items-start gap-2 text-sm">
                 <AlertCircle size={18} className="shrink-0 mt-0.5" />
-                <span>
-                  Cadastre pelo menos 1 Categoria e 1 Pessoa antes de lançar
-                  despesas.
-                </span>
+                <span>Cadastre pelo menos 1 Categoria e 1 Pessoa antes.</span>
               </div>
             )}
 
           <div>
-            <label
-              htmlFor="description"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Descrição
             </label>
             <input
               type="text"
-              id="description"
               required
               maxLength={200}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              placeholder="Ex: Mesada, Conta de Luz..."
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
               disabled={isLoadingDependencies}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label
-                htmlFor="amount"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Valor (R$)
               </label>
               <input
                 type="number"
-                id="amount"
                 required
                 min={0.01}
                 step="0.01"
@@ -219,29 +218,19 @@ export function TransactionModal({
                 onChange={(e) =>
                   setAmount(e.target.value === "" ? "" : Number(e.target.value))
                 }
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="0.00"
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 disabled={isLoadingDependencies}
               />
             </div>
-
             <div>
-              <label
-                htmlFor="type"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Tipo
               </label>
               <select
-                id="type"
                 required
                 value={type}
                 onChange={(e) => setType(e.target.value)}
-                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none ${
-                  isMinor
-                    ? "bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed"
-                    : "bg-white border-gray-300"
-                }`}
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none ${isMinor ? "bg-gray-100 text-gray-500 cursor-not-allowed" : "bg-white"}`}
                 disabled={isLoadingDependencies || isMinor}
               >
                 <option value="Expense">Despesa</option>
@@ -258,42 +247,34 @@ export function TransactionModal({
           )}
 
           <div>
-            <label
-              htmlFor="personId"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Pessoa
             </label>
             <select
-              id="personId"
               required
               value={personId}
               onChange={(e) =>
                 setPersonId(e.target.value === "" ? "" : Number(e.target.value))
               }
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
               disabled={isLoadingDependencies || people.length === 0}
             >
               <option value="" disabled>
-                Selecione uma Pessoa...
+                Selecione...
               </option>
               {people.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} (Idade: {p.age})
+                  {p.name}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label
-              htmlFor="categoryId"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Categoria
             </label>
             <select
-              id="categoryId"
               required
               value={categoryId}
               onChange={(e) =>
@@ -301,17 +282,16 @@ export function TransactionModal({
                   e.target.value === "" ? "" : Number(e.target.value),
                 )
               }
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
               disabled={
                 isLoadingDependencies || availableCategories.length === 0
               }
             >
               <option value="" disabled>
                 {availableCategories.length === 0
-                  ? "Nenhuma categoria disponível para este tipo"
-                  : "Selecione uma Categoria..."}
+                  ? "Nenhuma válida"
+                  : "Selecione..."}
               </option>
-
               {availableCategories.map((cat) => (
                 <option key={cat.id} value={cat.id}>
                   {cat.description}
@@ -325,7 +305,7 @@ export function TransactionModal({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium"
             >
               Cancelar
             </button>
@@ -336,7 +316,7 @@ export function TransactionModal({
                 availableCategories.length === 0 ||
                 people.length === 0
               }
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-sm"
             >
               {isSubmitting ? "Salvando..." : "Salvar"}
             </button>

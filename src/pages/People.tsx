@@ -6,22 +6,16 @@ import { api } from "../services/api";
 interface Person {
   id: number;
   name: string;
+  age: number;
 }
 
-/**
- * Página principal de gestão de Pessoas.
- * Implementa a listagem (GET) e coordena a abertura do Modal de criação (POST).
- */
 export function People() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [people, setPeople] = useState<Person[]>([]);
-
-  // Estado para gerenciar a UX de carregamento, evitando que a tela pisque
-  // com "Nenhum dado" antes da API retornar a resposta.
   const [isLoading, setIsLoading] = useState(true);
 
-  // Extraímos a chamada da API para uma função separada para permitir
-  // reuso tanto no mount do componente quanto após o sucesso de um novo cadastro.
+  const [personToEdit, setPersonToEdit] = useState<Person | null>(null);
+
   const loadPeople = async () => {
     try {
       setIsLoading(true);
@@ -34,10 +28,37 @@ export function People() {
     }
   };
 
-  // Ciclo de vida: Busca a lista de pessoas assim que a tela é montada
   useEffect(() => {
     loadPeople();
   }, []);
+
+  const handleEdit = (person: Person) => {
+    setPersonToEdit(person);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: number, name: string) => {
+    const confirmDelete = window.confirm(
+      `ATENÇÃO: Tem certeza que deseja excluir '${name}'?\n\nIsso apagará TODAS as transações relacionadas a esta pessoa permanentemente.`,
+    );
+
+    if (confirmDelete) {
+      try {
+        await api.delete(`/people/${id}`);
+        loadPeople();
+      } catch (error) {
+        console.error("Erro ao excluir:", error);
+        alert(
+          "Não foi possível excluir a pessoa. Verifique a conexão com o servidor.",
+        );
+      }
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setPersonToEdit(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -48,10 +69,12 @@ export function People() {
             Gerencie os usuários e contatos do sistema.
           </p>
         </div>
-
         <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
+          onClick={() => {
+            setPersonToEdit(null);
+            setIsModalOpen(true);
+          }}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm"
         >
           <Plus size={20} />
           Nova Pessoa
@@ -71,7 +94,6 @@ export function People() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {/* Feedback de carregamento (Loading State) */}
               {isLoading && (
                 <tr>
                   <td
@@ -82,8 +104,6 @@ export function People() {
                   </td>
                 </tr>
               )}
-
-              {/* Empty State: Mostrado apenas quando já carregou e a lista está vazia */}
               {!isLoading && people.length === 0 && (
                 <tr>
                   <td
@@ -94,8 +114,6 @@ export function People() {
                   </td>
                 </tr>
               )}
-
-              {/* Renderização da lista hidratada pela API */}
               {people.map((person) => (
                 <tr
                   key={person.id}
@@ -116,10 +134,19 @@ export function People() {
                   </td>
                   <td className="px-6 py-4 text-center">
                     <div className="flex items-center justify-center gap-3">
-                      <button className="text-blue-600 hover:text-blue-800">
+                      <button
+                        onClick={() => handleEdit(person)}
+                        className="text-blue-600 hover:text-blue-800 transition-colors"
+                        title="Editar"
+                      >
                         <Pencil size={18} />
                       </button>
-                      <button className="text-red-600 hover:text-red-800">
+
+                      <button
+                        onClick={() => handleDelete(person.id, person.name)}
+                        className="text-red-600 hover:text-red-800 transition-colors"
+                        title="Excluir"
+                      >
                         <Trash2 size={18} />
                       </button>
                     </div>
@@ -133,8 +160,9 @@ export function People() {
 
       <PersonModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleCloseModal}
         onSuccess={loadPeople}
+        personToEdit={personToEdit}
       />
     </div>
   );
