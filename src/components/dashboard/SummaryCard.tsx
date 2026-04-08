@@ -8,9 +8,6 @@ interface SummaryCardProps {
   iconBgClass: string;
 }
 
-// Isolei esse Card de Resumo em um componente separado para evitar repetição de código no Dashboard.
-// A ideia é que ele seja genérico: o Dashboard só precisa passar o título, o valor e qual ícone/cor
-// usar via props, e esse componente cuida de renderizar a caixinha bonitinha.
 export function SummaryCard({
   title,
   amount,

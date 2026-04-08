@@ -188,7 +188,7 @@ export function Transactions() {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onSuccess={loadTransactions}
-        transactionToEdit={transactionToEdit} // Passando os dados para o Modal!
+        transactionToEdit={transactionToEdit}
       />
     </div>
   );

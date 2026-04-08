@@ -2,9 +2,7 @@ import { LayoutDashboard, Users, Tags, ArrowRightLeft } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 export function Sidebar() {
-  const location = useLocation(); // Pega a URL atual para sabermos qual menu "pintar" de ativo
-
-  // Função auxiliar para não repetir as classes de CSS ativo/inativo
+  const location = useLocation();
   const getLinkClass = (path: string) => {
     const isActive = location.pathname === path;
     return `flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${

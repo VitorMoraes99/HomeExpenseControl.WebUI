@@ -9,7 +9,6 @@ import {
 import { useState, useEffect } from "react";
 import { api } from "../services/api";
 
-// --- Tipagens ---
 interface Transaction {
   id: number;
   amount: number;
@@ -39,11 +38,6 @@ interface EntitySummary extends Summary {
   name: string;
 }
 
-/**
- * Página de Dashboard Principal com Relatórios Avançados.
- * Lógica: O processamento de dados (cruzamento de transações com pessoas e categorias)
- * está sendo feito no Front-end para demonstrar domínio de manipulação de Arrays no JS/TS.
- */
 export function Dashboard() {
   const [summary, setSummary] = useState<Summary>({
     income: 0,

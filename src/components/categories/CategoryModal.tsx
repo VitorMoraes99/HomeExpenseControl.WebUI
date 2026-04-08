@@ -25,7 +25,6 @@ export function CategoryModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  // Preenche os dados se for edição
   useEffect(() => {
     if (categoryToEdit) {
       setDescription(categoryToEdit.description);

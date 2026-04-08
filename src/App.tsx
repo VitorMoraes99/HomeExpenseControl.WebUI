@@ -5,9 +5,6 @@ import { People } from "./pages/People";
 import { Categories } from "./pages/Categories";
 import { Transactions } from "./pages/Transactions";
 
-// Ponto de entrada das rotas. O BrowserRouter engloba tudo.
-// O AppLayout fica por fora das Routes para que a Sidebar não recarregue nunca,
-// apenas o conteúdo do "meio" muda conforme a rota.
 export default function App() {
   return (
     <BrowserRouter>
