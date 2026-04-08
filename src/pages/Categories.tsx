@@ -1,67 +1,73 @@
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { CategoryModal } from "../components/categories/CategoryModal";
-import { api } from "../services/api"; // Importando o Axios que você configurou!
+import { api } from "../services/api";
 
-// Definimos o formato exato que o seu C# devolve para o TypeScript não reclamar
 interface Category {
   id: number;
   description: string;
-  purpose: string;
+  purpose: "Expense" | "Income" | "Both";
 }
 
 export function Categories() {
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // Nossos novos estados: um para guardar as categorias do banco, outro para mostrar "Carregando..."
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [categoryToEdit, setCategoryToEdit] = useState<Category | null>(null);
 
-  // Função que vai lá no C# buscar as categorias
   const loadCategories = async () => {
     try {
       setIsLoading(true);
-      // Aqui a mágica acontece! Bate no endpoint GET /api/categories
       const response = await api.get("/categories");
       setCategories(response.data);
     } catch (error) {
       console.error("Erro ao buscar categorias:", error);
-      alert(
-        "Não foi possível carregar as categorias. Verifique se a API está rodando.",
-      );
     } finally {
       setIsLoading(false);
     }
   };
 
-  // O useEffect com array vazio [] roda UMA única vez assim que o usuário entra na tela
   useEffect(() => {
     loadCategories();
   }, []);
 
-  const renderPurposeBadge = (purpose: string) => {
-    // Normalizando a string para garantir que minúsculas/maiúsculas do C# não quebrem a cor
-    const normalizedPurpose = purpose.toLowerCase();
+  const handleEdit = (category: Category) => {
+    setCategoryToEdit(category);
+    setIsModalOpen(true);
+  };
 
-    switch (normalizedPurpose) {
-      case "despesa":
-        return (
-          <span className="px-2 py-1 bg-red-100 text-red-700 rounded-md text-xs font-medium uppercase">
-            Despesa
-          </span>
+  const handleDelete = async (id: number, description: string) => {
+    const confirmDelete = window.confirm(
+      `Deseja realmente excluir a categoria '${description}'?`,
+    );
+    if (confirmDelete) {
+      try {
+        await api.delete(`/categories/${id}`);
+        loadCategories();
+      } catch (error) {
+        console.error("Erro ao excluir:", error);
+        alert(
+          "Não foi possível excluir. Talvez existam transações usando esta categoria.",
         );
-      case "receita":
-        return (
-          <span className="px-2 py-1 bg-green-100 text-green-700 rounded-md text-xs font-medium uppercase">
-            Receita
-          </span>
-        );
+      }
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setCategoryToEdit(null);
+  };
+
+  const translatePurpose = (purpose: string) => {
+    switch (purpose) {
+      case "Expense":
+        return "DESPESA";
+      case "Income":
+        return "RECEITA";
+      case "Both":
+        return "AMBAS";
       default:
-        return (
-          <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-md text-xs font-medium uppercase">
-            Ambas
-          </span>
-        );
+        return purpose;
     }
   };
 
@@ -74,10 +80,12 @@ export function Categories() {
             Gerencie os tipos de despesas e receitas.
           </p>
         </div>
-
         <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
+          onClick={() => {
+            setCategoryToEdit(null);
+            setIsModalOpen(true);
+          }}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm"
         >
           <Plus size={20} />
           Nova Categoria
@@ -91,65 +99,71 @@ export function Categories() {
               <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
                 <th className="px-6 py-4 font-semibold w-24">ID</th>
                 <th className="px-6 py-4 font-semibold">Descrição</th>
-                <th className="px-6 py-4 font-semibold w-40">Finalidade</th>
+                <th className="px-6 py-4 font-semibold">Finalidade</th>
                 <th className="px-6 py-4 font-semibold w-32 text-center">
                   Ações
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {/* Se estiver carregando, mostra uma mensagem simples */}
               {isLoading && (
                 <tr>
                   <td
                     colSpan={4}
                     className="px-6 py-8 text-center text-gray-500"
                   >
-                    Carregando categorias do servidor...
+                    Carregando...
                   </td>
                 </tr>
               )}
-
-              {/* Se terminou de carregar e não tem nada, avisa o usuário */}
               {!isLoading && categories.length === 0 && (
                 <tr>
                   <td
                     colSpan={4}
                     className="px-6 py-8 text-center text-gray-500"
                   >
-                    Nenhuma categoria cadastrada no banco de dados.
+                    Nenhuma categoria registrada.
                   </td>
                 </tr>
               )}
-
-              {/* Loop real nos dados do banco */}
-              {!isLoading &&
-                categories.map((category) => (
-                  <tr
-                    key={category.id}
-                    className="hover:bg-gray-50/50 transition-colors"
-                  >
-                    <td className="px-6 py-4 text-gray-500 font-medium">
-                      #{category.id}
-                    </td>
-                    <td className="px-6 py-4 text-gray-800 font-medium">
-                      {category.description}
-                    </td>
-                    <td className="px-6 py-4">
-                      {renderPurposeBadge(category.purpose)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-center gap-3">
-                        <button className="text-blue-600 hover:text-blue-800 transition-colors">
-                          <Pencil size={18} />
-                        </button>
-                        <button className="text-red-600 hover:text-red-800 transition-colors">
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+              {categories.map((category) => (
+                <tr
+                  key={category.id}
+                  className="hover:bg-gray-50/50 transition-colors"
+                >
+                  <td className="px-6 py-4 text-gray-500 font-medium">
+                    #{category.id}
+                  </td>
+                  <td className="px-6 py-4 text-gray-800 font-medium">
+                    {category.description}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="bg-blue-50 text-blue-600 text-xs font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide">
+                      {translatePurpose(category.purpose)}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <div className="flex items-center justify-center gap-3">
+                      <button
+                        onClick={() => handleEdit(category)}
+                        className="text-blue-600 hover:text-blue-800"
+                        title="Editar"
+                      >
+                        <Pencil size={18} />
+                      </button>
+                      <button
+                        onClick={() =>
+                          handleDelete(category.id, category.description)
+                        }
+                        className="text-red-600 hover:text-red-800"
+                        title="Excluir"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -157,8 +171,9 @@ export function Categories() {
 
       <CategoryModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleCloseModal}
         onSuccess={loadCategories}
+        categoryToEdit={categoryToEdit}
       />
     </div>
   );
